@@ -37,7 +37,7 @@ class ImageClassificationBase(nn.Module):
             epoch, result['train_loss'], result['val_loss'], result['val_acc']))
 
 class GenericLinearModel(ImageClassificationBase):
-    def __init__(self, in_size, n_channels):
+    def __init__(self, in_size):
         super().__init__()
         self.in_size = in_size
         self.network = nn.Sequential(
@@ -91,4 +91,7 @@ class GenericConvModel(ImageClassificationBase):
         )
         
     def forward(self, xb):
-        return self.network(xb)   
+        x = self.network[:-3](xb)  # Pass through the Conv layers
+        self.img_final_size = x.shape[-1]  # Get dynamic size after Conv layers
+        x = self.network[-3:](x.view(x.size(0), -1))  # Flatten and pass through FC layers
+        return x

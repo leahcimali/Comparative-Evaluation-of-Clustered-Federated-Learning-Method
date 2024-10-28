@@ -214,7 +214,11 @@ def init_server_cluster(my_server : Server, list_clients : list, row_exp : dict,
     p_rest = (1 - p_expert_opinion) / (row_exp['num_clusters'] - 1)
 
     my_server.num_clusters = row_exp['num_clusters']
-    my_server.clusters_models = {cluster_id: GenericConvModel(in_size=imgs_params[0], n_channels=imgs_params[1]) for cluster_id in range(row_exp['num_clusters'])}
+    if row_exp['nn_model'] == 'linear':
+        my_server.clusters_models = {cluster_id: GenericLinearModel(in_size=imgs_params[0]) for cluster_id in range(row_exp['num_clusters'])}
+        
+    elif row_exp['nn_model'] == 'convolutional':
+        my_server.clusters_models = {cluster_id: GenericConvModel(in_size=imgs_params[0], n_channels=imgs_params[1]) for cluster_id in range(row_exp['num_clusters'])}
     
     for client in list_clients:
     

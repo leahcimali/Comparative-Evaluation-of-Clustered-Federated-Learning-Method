@@ -48,25 +48,34 @@ def create_label_dict(dataset : str, nn_model : str) -> dict:
     import torchvision
    
     import torchvision.transforms as transforms
+    
+    
 
     if dataset == "fashion-mnist":
-        fashion_mnist = torchvision.datasets.MNIST("datasets", download=True)
+        fashion_mnist = torchvision.datasets.FashionMNIST("datasets", download=True)
         (x_data, y_data) = fashion_mnist.data, fashion_mnist.targets
-        x_data = x_data.unsqueeze(3)
+        if nn_model == "convolutional":
+            x_data = x_data.unsqueeze(1) # Change shape to (samples, 1, H, W)
+        
     elif dataset == 'mnist':
         mnist = torchvision.datasets.MNIST("datasets", download=True)
         (x_data, y_data) = mnist.data, mnist.targets
-        x_data = x_data.unsqueeze(3)
-    elif dataset == "cifar10":
-        cifar10 = torchvision.datasets.CIFAR10("datasets", download=True)
-        (x_data, y_data) = cifar10.data, cifar10.targets
-         
+        if nn_model == "convolutional":
+            x_data = x_data.unsqueeze(1) # Change shape to (samples, 1, H, W)
+    
     elif dataset == 'kmnist':
         kmnist = torchvision.datasets.KMNIST("datasets", download=True)
-        x_data = kmnist.data  # This gives you the images
-        x_data = x_data.unsqueeze(3)
-        y_data = kmnist.targets  # This gives you the labels  
-         
+        x_data, y_data = kmnist.data, kmnist.targets
+        if nn_model == "convolutional":
+            x_data = x_data.unsqueeze(1) # Change shape to (samples, 1, H, W)
+            
+    elif dataset == "cifar10":
+        if nn_model == "linear":
+            raise ValueError("CIFAR-10 cannot be used with a linear model. Please use a convolutional model.")
+
+        cifar10 = torchvision.datasets.CIFAR10("datasets", download=True)
+        x_data, y_data = cifar10.data, cifar10.targets
+        x_data = np.transpose(x_data, (0, 3, 1, 2))  # Change shape to (samples, C, H, W)
     else:
         sys.exit("Unrecognized dataset. Please make sure you are using one of the following ['mnist', fashion-mnist', 'kmnist']")    
 
@@ -155,59 +164,82 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 import torchvision.transforms as transforms
 
-
-class AddGaussianNoise(object):
-    
-    def __init__(self, mean=0., std=1.):
-        self.std = std
-        self.mean = mean
-        
-    def __call__(self, tensor):
-        import torch
-        return tensor + torch.randn(tensor.size()) * self.std + self.mean
-    
-    def __repr__(self):
-        return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
-
-class AddRandomJitter(object):
-
-    def __init__(self, brightness =0.5, contrast = 1, saturation = 0.1, hue = 0.5):
-        self.brightness = brightness,
-        self.contrast = contrast, 
-        self.saturation = saturation, 
-        self.hue = hue
-    
-    def __call__(self, tensor):
-        import torchvision.transforms as transforms
-        transform = transforms.ColorJitter(brightness = self.brightness, contrast= self.contrast, 
-                               saturation = self.saturation, hue = self.hue)
-        return transform(tensor)
-
 class CustomDataset(Dataset):
-    
-    def __init__(self, data, labels, transform=None):
-        # Ensure data is in (N, H, W, C) format
-        self.data = data  # Assume data is in (N, H, W, C) format
-        self.labels = labels
+    """Custom dataset to apply transformations."""
+    def __init__(self, x_data, y_data, transform=None):
+        self.x_data = x_data
+        self.y_data = y_data
         self.transform = transform
 
     def __len__(self):
-        return len(self.data)
+        return len(self.x_data)
 
     def __getitem__(self, idx):
-        image = self.data[idx]  # Shape (H, W, C)
-        label = self.labels[idx]
+        sample = self.x_data[idx]
+        label = self.y_data[idx]
 
-        # Convert image to tensor and permute to (C, H, W)
-        image = torch.tensor(image, dtype=torch.float)  # Convert to tensor
-        image = image.permute(2, 0, 1)  # Change to (C, H, W)
-
-        # Apply transformation if provided
         if self.transform:
-            image = self.transform(image)
+            sample = self.transform(sample)
 
-        return image, label
-
+        return sample, label
+    
+def data_transformation(row_exp : dict)-> tuple:
+    '''
+    Create transformation relative to the dataset and nn_model type
+    Arguments:
+        row_exp : The current experiment's global parameters
+    Returns:
+        tuple: A tuple containing three elements:
+            - train_transform (transforms.Compose): Transformations applied 
+              to the training dataset.
+            - val_transform (transforms.Compose): Transformations applied 
+              to the validation dataset.
+            - test_transform (transforms.Compose): Transformations applied 
+              to the test dataset.
+    '''
+    if row_exp['dataset'] == 'cifar10': 
+        train_transform = transforms.Compose([
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomRotation(20),
+            transforms.RandomCrop(32, padding=4),
+            transforms.ToTensor(),  # Convert to tensor
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
+        val_transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
+        test_transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])      
+    elif row_exp['nn_model'] == 'convolutional': #dataset of mnist type
+        # For other datasets
+        train_transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.5,), (0.5,))
+        ])
+        val_transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5,), (0.5,))
+        ])
+        test_transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5,), (0.5,))
+        ]) 
+    else : #linear + mnist type dataset
+         # For other datasets
+        train_transform = transforms.Compose([
+            transforms.ToTensor()
+        ])
+        val_transform = transforms.Compose([
+        transforms.ToTensor()
+        ])
+        test_transform = transforms.Compose([
+        transforms.ToTensor()
+        ])     
+    return train_transform, val_transform, test_transform 
+    
 def data_preparation(client: Client, row_exp: dict) -> None:
     """Saves Dataloaders of train and test data in the Client attributes 
     
@@ -215,57 +247,35 @@ def data_preparation(client: Client, row_exp: dict) -> None:
         client : The client object to modify
         row_exp : The current experiment's global parameters
     """
-
-    def to_device_tensor(data, device, data_dtype):
-        data = torch.tensor(data, dtype=data_dtype)
-        data = data.to(device)
-        return data
     
     import torch 
     from sklearn.model_selection import train_test_split
     from torch.utils.data import DataLoader, TensorDataset, Dataset
     import torchvision.transforms as transforms
     import numpy as np  # Import NumPy for transpose operation
-    
-    # Define data augmentation transforms
-    if row_exp['dataset'] == 'cifar10': 
-        train_transform = transforms.Compose([
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(20),  # Normalize if needed
-        transforms.RandomCrop(32, padding=4),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        ])
-        # Transform for validation and test data (no augmentation, just normalization)
-        test_val_transform = transforms.Compose([
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),  # Normalize if needed
-    ])
-    else : 
-        train_transform = transforms.Compose([
-        transforms.Normalize((0.5,), (0.5,)),  # Normalize if needed
-    ])
-        
-        # Transform for validation and test data (no augmentation, just normalization)
-        test_val_transform = transforms.Compose([
-            transforms.Normalize((0.5,), (0.5,)),  # Normalize if needed
-        ])
-
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     # Split into train, validation, and test sets
-    x_data, x_test, y_data, y_test = train_test_split(client.data['x'], client.data['y'], test_size=0.3, random_state=row_exp['seed'], stratify=client.data['y'])
-    x_train, x_val, y_train, y_val  = train_test_split(x_data, y_data, test_size=0.25, random_state=42)
-
+    x_data, x_test, y_data, y_test = train_test_split(
+        client.data['x'], client.data['y'], test_size=0.3, 
+        random_state=row_exp['seed'], stratify=client.data['y']
+    )
+    x_train, x_val, y_train, y_val  = train_test_split(
+        x_data, y_data, test_size=0.25, random_state=42
+    )
+    
+    # Define data augmentation transforms
+    train_transform, val_transform, test_transform = data_transformation(row_exp)
 
     # Create datasets with transformations
     train_dataset = CustomDataset(x_train, y_train, transform=train_transform)
-    val_dataset = CustomDataset(x_val, y_val, transform=test_val_transform)
-    test_dataset = CustomDataset(x_test, y_test, transform=test_val_transform)
+    val_dataset = CustomDataset(x_val, y_val, transform=val_transform)
+    test_dataset = CustomDataset(x_test, y_test, transform=test_transform)
 
     # Create DataLoaders
     train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True)
-    validation_loader = DataLoader(val_dataset, batch_size=128, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=128, shuffle=True)
-
+    validation_loader = DataLoader(val_dataset, batch_size=128, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)
     # Store DataLoaders in the client object
     setattr(client, 'data_loader', {'train': train_loader, 'val': validation_loader, 'test': test_loader})
     setattr(client, 'train_test', {'x_train': x_train, 'x_val': x_val, 'x_test': x_test, 'y_train': y_train, 'y_val': y_val, 'y_test': y_test})
@@ -327,7 +337,7 @@ def setup_experiment(row_exp: dict) -> Tuple[Server, list]:
 
     if row_exp['nn_model'] == "linear":
         
-        model_server = Server(GenericLinearModel(in_size=imgs_params[row_exp['dataset']][0], n_channels=imgs_params[row_exp['dataset']][1])) 
+        model_server = Server(GenericLinearModel(in_size=imgs_params[row_exp['dataset']][0])) 
     
     elif row_exp['nn_model'] == "convolutional": 
         
@@ -633,28 +643,9 @@ def centralize_data(list_clients: list, row_exp: dict) -> Tuple[DataLoader, Data
     from torch.utils.data import DataLoader,TensorDataset
     import numpy as np 
     
-    if row_exp['dataset'] == 'cifar10': 
-        train_transform = transforms.Compose([
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(20),  # Normalize if needed
-        transforms.RandomCrop(32, padding=4),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        ])
-        # Transform for validation and test data (no augmentation, just normalization)
-        test_val_transform = transforms.Compose([
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), ])
-    else : 
-        train_transform = transforms.Compose([
-        transforms.Normalize((0.5,), (0.5,)),  # Normalize if needed
-    ])
-        # Transform for validation and test data (no augmentation, just normalization)
-        test_val_transform = transforms.Compose([
-            transforms.Normalize((0.5,), (0.5,)),  # Normalize if needed
-        ])
+# Define data augmentation transforms
+    train_transform, test_val_transform = data_transformation(row_exp)
 
-
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
     # Concatenate training data from all clients
     x_train = np.concatenate([list_clients[id].train_test['x_train'] for id in range(len(list_clients))], axis=0)
     y_train = np.concatenate([list_clients[id].train_test['y_train'] for id in range(len(list_clients))], axis=0)
@@ -674,9 +665,9 @@ def centralize_data(list_clients: list, row_exp: dict) -> Tuple[DataLoader, Data
 
     # Create DataLoaders
     train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=128, shuffle=False)  # Validation typically not shuffled
-    test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)  # Test data typically not shuffled
-
+    val_loader = DataLoader(val_dataset, batch_size=128, shuffle=False)  
+    test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)
+    
     return train_loader, val_loader, test_loader
 
 
