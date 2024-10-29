@@ -226,9 +226,9 @@ def summarize_results() -> None:
             
     df_results = pd.DataFrame(list_results)
     
-    df_results.sort_values(['dataset_type',  'dataset', 'exp_type', 'number_of_clients'], inplace=True)
+    df_results.sort_values(['dataset_type',  'dataset', 'exp_type', 'nn_model','number_of_clients'], inplace=True)
     
-    df_results = df_results[['exp_type', 'dataset', 'num_clusters', 'dataset_type', "accuracy", "ARI", "AMI", "hom", "cmplt", "vm"]]
+    df_results = df_results[['exp_type','nn_model','number_of_clients', 'dataset', 'num_clusters', 'dataset_type', "accuracy", "ARI", "AMI", "hom", "cmplt", "vm"]]
     
     df_results.to_csv("results/summarized_results.csv", float_format='%.2f', index=False, na_rep="n/a")
 
