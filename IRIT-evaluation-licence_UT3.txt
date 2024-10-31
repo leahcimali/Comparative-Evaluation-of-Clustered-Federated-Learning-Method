@@ -4,7 +4,7 @@ IRIT computer science research laboratory, Toulouse, France.
 ------------------------------------------------------------
 
 Definitions
-SOFTWARE:  The "Comparative-Evaluation-of-Clustered-Federated-Learning-Method" software,  in source-code form, written by leahcimali and omar-rifai at the IRIT computer science research laboratory.
+SOFTWARE:  The "Comparative-Evaluation-of-Clustered-Federated-Learning-Methods" software,  in source-code form, written by leahcimali and omar-rifai at the IRIT computer science research laboratory.
 
 LICENSOR: L’UNIVERSITE TOULOUSE III - PAUL SABATIER, a public scientific, cultural and professional establishment, having SIRET No. 193 113 842 00010, APE code 8542 Z, having its registered office at 118, route de Narbonne, 31062 Toulouse Cedex 9, France, acting in its own name and on its own behalf, and on behalf of l'Institut de Recherche en Informatique de Toulouse (IRIT), UMR N°5055.
 
