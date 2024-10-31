@@ -1,4 +1,4 @@
-#### Code for the paper: *Comparative Evaluation of Clustered Federated Learning Method*
+#### Code for the paper: *Comparative Evaluation of Clustered Federated Learning Methods*
 
 ##### Submited to 'The 2nd IEEE International Conference on Federated Learning Technologies and Applications (FLTA24), VALENCIA, SPAIN' 
 
